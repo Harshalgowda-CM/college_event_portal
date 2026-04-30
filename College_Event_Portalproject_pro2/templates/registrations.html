@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Registrations | College Event Statistics Portal{% endblock %}
+{% block content %}
+<section class="page-header glass-panel">
+  <div>
+    <p class="eyebrow">Mapping operations</p>
+    <h1>Event Registrations</h1>
+  </div>
+  <a href="{{ url_for('participants') }}" class="ghost-btn compact glow-btn">Add More Participants</a>
+</section>
+
+<section class="grid-two form-layout">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Create registration</p>
+        <h3>Map participant to event</h3>
+      </div>
+    </div>
+    <form method="POST" class="form-grid">
+      <select name="event_id" required>
+        <option value="">Select event</option>
+        {% for event in events %}
+        <option value="{{ event.event_id }}">{{ event.event_name }} | {{ event.event_date_label }}</option>
+        {% endfor %}
+      </select>
+      <select name="participant_id" required>
+        <option value="">Select participant</option>
+        {% for participant in participants %}
+        <option value="{{ participant.participant_id }}">{{ participant.participant_name }} | {{ participant.department_label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="primary-btn glow-btn">Register Participant</button>
+    </form>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Registration records</p>
+        <h3>All registrations</h3>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Participant</th>
+            <th>Event</th>
+            <th>Recorded On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for registration in registrations %}
+          <tr>
+            <td>{{ registration.participant_label }}</td>
+            <td>{{ registration.event_label }}</td>
+            <td>{{ registration.registered_at[:10] if registration.registered_at else '-' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3">No registrations recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+{% endblock %}

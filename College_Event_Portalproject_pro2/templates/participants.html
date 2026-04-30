@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Participants | College Event Portal{% endblock %}
+{% block content %}
+<section class="page-header glass-panel">
+  <div>
+    <p class="eyebrow">Host-only records</p>
+    <h1>Participant Directory</h1>
+  </div>
+  <span class="status-badge">Host Access</span>
+</section>
+
+<section class="bubble-bar glass-panel">
+  <a href="{{ url_for('participants') }}" class="bubble-link active">All Participants</a>
+  {% for event in host_events[:8] %}
+  <a href="{{ url_for('participants', event_id=event.event_id) }}" class="bubble-link {% if selected_event_id == event.event_id %}active{% endif %}">{{ event.event_name }}</a>
+  {% endfor %}
+  <a href="{{ url_for('download_scope', scope='participants') }}" class="bubble-link">Download Data</a>
+  {% if selected_event_id %}
+  <a href="{{ url_for('download_scope', scope='participants', event_id=selected_event_id) }}" class="bubble-link">Download Filtered</a>
+  {% endif %}
+</section>
+
+<section class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Complete participant list</p>
+      <h3>Demo data and real student accounts</h3>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Registration No</th>
+          <th>Department</th>
+          <th>Year</th>
+          <th>Type</th>
+          <th>Selected Events</th>
+          <th>Phone</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for participant in participants %}
+        <tr>
+          <td>{{ participant.participant_name }}</td>
+          <td>{{ participant.registration_number or '-' }}</td>
+          <td>{{ participant.department_label }}</td>
+          <td>{{ participant.year_of_study or '-' }}</td>
+          <td>{{ participant.participant_type }}</td>
+          <td>{{ participant.selected_events_label }}</td>
+          <td>{{ participant.phone or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No participants found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

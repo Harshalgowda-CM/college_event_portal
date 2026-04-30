@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard | College Event Portal{% endblock %}
+{% block content %}
+<section class="hero-panel glass-panel">
+  <div>
+    <p class="eyebrow">{{ 'Host dashboard' if current_user.role == 'host' else 'Student dashboard' }}</p>
+    <h1>{{ 'University Event Command Center' if current_user.role == 'host' else 'Welcome Back, ' + user_name }}</h1>
+    <p class="lead-copy">
+      {% if current_user.role == 'host' %}
+      Review event requests, publish results, control public branding, and manage participation across ELEGANT, ECHOES OF YOUTH, and NEXUS.
+      {% else %}
+      Explore university festivals, register for events, follow your participation history, and watch result announcements in one smooth portal.
+      {% endif %}
+    </p>
+  </div>
+  <div class="hero-actions">
+    <a href="{{ url_for('events') }}" class="primary-btn compact glow-btn">{{ 'Open Event Control' if current_user.role == 'host' else 'Browse Events' }}</a>
+    <a href="{{ url_for('participations') }}" class="secondary-btn compact glow-btn">{{ 'Participation Control' if current_user.role == 'host' else 'Participate Now' }}</a>
+    <a href="{{ url_for('analytics') }}" class="ghost-btn compact glow-btn">View Graphs</a>
+    {% if current_user.role == 'host' %}
+    <a href="{{ url_for('download_scope', scope='dashboard') }}" class="ghost-btn compact glow-btn">Download All Data</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if current_user.role == 'host' %}
+<section class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Public logo control</p>
+      <h3>Upload one logo visible to all users</h3>
+    </div>
+  </div>
+  <form method="POST" action="{{ url_for('branding') }}" enctype="multipart/form-data" class="brand-upload-form">
+    <input type="file" name="public_logo" accept=".png,.jpg,.jpeg,.webp" required>
+    <button type="submit" class="primary-btn compact glow-btn">Update Logo</button>
+  </form>
+  {% if public_logo %}
+  <div class="public-photo-preview">
+    <img src="{{ url_for('static', filename=public_logo) }}" alt="Public portal logo preview">
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="stat-grid">
+  {% if current_user.role == 'host' %}
+  <article class="stat-card glass-panel"><p>Total Participants</p><h2>{{ stats.participants }}</h2><span>Visible to host</span></article>
+  <article class="stat-card glass-panel"><p>Total Events</p><h2>{{ stats.events }}</h2><span>Across all festivals</span></article>
+  <article class="stat-card glass-panel"><p>Pending Requests</p><h2>{{ stats.pending_requests }}</h2><span>Waiting for approval</span></article>
+  <article class="stat-card glass-panel"><p>Results Published</p><h2>{{ stats.announced_results }}</h2><span>Live competition boards</span></article>
+  {% else %}
+  <article class="stat-card glass-panel"><p>Approved Events</p><h2>{{ stats.approved_events }}</h2><span>Available to join</span></article>
+  <article class="stat-card glass-panel"><p>Registrations</p><h2>{{ stats.registrations }}</h2><span>Portal activity</span></article>
+  <article class="stat-card glass-panel"><p>My Participations</p><h2>{{ stats.my_events }}</h2><span>Your joined events</span></article>
+  <article class="stat-card glass-panel"><p>My Wins</p><h2>{{ stats.my_wins }}</h2><span>Competition achievements</span></article>
+  {% endif %}
+</section>
+
+<section class="grid-two">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Festival spotlight</p>
+        <h3>Main university festivals</h3>
+      </div>
+    </div>
+    <div class="festival-grid">
+      {% for festival_name in festival_names %}
+      <div class="festival-card">
+        <strong>{{ festival_name }}</strong>
+        <span>{{ festival_counter.get(festival_name, 0) }} events visible</span>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Top registrations</p>
+        <h3>Popular events right now</h3>
+      </div>
+    </div>
+    <div class="meter-list">
+      {% for item in top_events %}
+      <div class="meter-row">
+        <div class="meter-labels"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+        <div class="meter-track"><div class="meter-fill" style="width: {{ [item.value * 4, 100]|min }}%"></div></div>
+      </div>
+      {% else %}
+      <div class="empty-state">Registrations will appear here after participation begins.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="grid-two">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">{{ 'Requests and activity' if current_user.role == 'host' else 'Upcoming approved events' }}</p>
+        <h3>{{ 'Pending event requests' if current_user.role == 'host' else 'Upcoming event schedule' }}</h3>
+      </div>
+      <a href="{{ url_for('events') }}" class="inline-link">Open</a>
+    </div>
+    <div class="stack-list">
+      {% if current_user.role == 'host' %}
+        {% for event in pending_requests %}
+        <div class="list-row">
+          <div>
+            <strong>{{ event.parent_festival }} | {{ event.event_name }}</strong>
+            <p>{{ event.category_label }} | {{ event.status }}</p>
+          </div>
+          <span>{{ event.event_date_label }}</span>
+        </div>
+        {% else %}
+        <div class="empty-state">No pending student requests.</div>
+        {% endfor %}
+      {% else %}
+        {% for event in upcoming_events %}
+        <div class="list-row">
+          <div>
+            <strong>{{ event.parent_festival }} | {{ event.event_name }}</strong>
+            <p>{{ event.venue or 'Campus venue' }}</p>
+          </div>
+          <span>{{ event.event_date_label }}</span>
+        </div>
+        {% else %}
+        <div class="empty-state">No approved upcoming events right now.</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">{{ 'Portal activity' if current_user.role == 'host' else 'My history' }}</p>
+        <h3>{{ 'Recent registrations' if current_user.role == 'host' else 'My latest participations' }}</h3>
+      </div>
+      <a href="{{ url_for('participations') if current_user.role == 'host' else url_for('profile') }}" class="inline-link">Open</a>
+    </div>
+    <div class="stack-list">
+      {% if current_user.role == 'host' %}
+        {% for row in recent_registrations %}
+        <div class="list-row">
+          <div>
+            <strong>{{ row.participant_name }}</strong>
+            <p>{{ row.festival }} | {{ row.event_name }}</p>
+          </div>
+          <span>{{ row.registered_at[:10] if row.registered_at else 'Today' }}</span>
+        </div>
+        {% else %}
+        <div class="empty-state">New registrations will appear here.</div>
+        {% endfor %}
+      {% else %}
+        {% for row in my_history %}
+        <div class="list-row">
+          <div>
+            <strong>{{ row.parent_festival }} | {{ row.event_name }}</strong>
+            <p>{{ row.venue or 'Campus venue' }}</p>
+          </div>
+          <span>{{ row.event_date_label }}</span>
+        </div>
+        {% else %}
+        <div class="empty-state">Your event history will appear after you participate.</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </article>
+</section>
+{% endblock %}

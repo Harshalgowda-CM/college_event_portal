@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Participations | College Event Portal{% endblock %}
+{% block content %}
+<section class="page-header glass-panel">
+  <div>
+    <p class="eyebrow">{{ 'Host participation control' if current_user.role == 'host' else 'Student participation center' }}</p>
+    <h1>{{ 'Register Participants Across Festivals' if current_user.role == 'host' else 'Add Your Participation' }}</h1>
+  </div>
+  <span class="status-badge">{{ selected_festival if selected_festival != 'ALL' else 'All Festivals' }}</span>
+</section>
+
+<section class="bubble-bar glass-panel">
+  {% if current_user.role == 'host' %}
+  <a href="{{ url_for('participations', festival='ALL') }}" class="bubble-link {% if selected_festival == 'ALL' %}active{% endif %}">All</a>
+  {% endif %}
+  {% for festival_name in festival_names %}
+  <a href="{{ url_for('participations', festival=festival_name) }}" class="bubble-link {% if selected_festival == festival_name %}active{% endif %}">{{ festival_name }}</a>
+  {% endfor %}
+  <a href="{{ url_for('download_scope', scope='participations', festival=selected_festival or 'ALL') }}" class="bubble-link">Download Data</a>
+</section>
+
+<section class="grid-two">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Festival filter</p>
+        <h3>Select festival and event</h3>
+      </div>
+    </div>
+    <form method="GET" class="form-grid">
+      <select name="festival">
+        {% if current_user.role == 'host' %}
+        <option value="ALL" {% if selected_festival == 'ALL' %}selected{% endif %}>All Festivals</option>
+        {% endif %}
+        {% for festival_name in festival_names %}
+        <option value="{{ festival_name }}" {% if selected_festival == festival_name %}selected{% endif %}>{{ festival_name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="ghost-btn glow-btn">Filter Events</button>
+    </form>
+
+    <form method="POST" class="form-grid top-gap">
+      <input type="hidden" name="festival_filter" value="{{ selected_festival }}">
+      {% if current_user.role == 'host' %}
+      <select name="event_id" onchange="window.location='{{ url_for('participations') }}?festival={{ selected_festival }}&event_id=' + this.value" required>
+        <option value="">Select event first</option>
+        {% for event in filtered_events %}
+        <option value="{{ event.event_id }}" {% if selected_event_id == event.event_id %}selected{% endif %}>{{ event.parent_festival }} | {{ event.event_name }} | {{ event.event_date_label }}</option>
+        {% endfor %}
+      </select>
+      <select name="participant_id" required>
+        <option value="">{% if selected_event_id %}Select participant from registered list{% else %}Select event to load registered participants{% endif %}</option>
+        {% for participant in all_participants %}
+        <option value="{{ participant.participant_id }}">{{ participant.participant_name }} | {{ participant.registration_number or participant.roll_number }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <select name="event_id" required>
+        <option value="">{% if selected_festival %}Select event{% else %}Choose a festival first{% endif %}</option>
+        {% for event in filtered_events %}
+        <option value="{{ event.event_id }}">{{ event.parent_festival }} | {{ event.event_name }} | {{ event.event_date_label }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <button type="submit" class="primary-btn glow-btn">{{ 'Register Participant' if current_user.role == 'host' else 'Submit Participation' }}</button>
+    </form>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">{{ 'Visible event options' if current_user.role == 'host' else 'Available event list' }}</p>
+        <h3>Festival event options</h3>
+      </div>
+    </div>
+    <div class="event-showcase single-column">
+      {% for event in filtered_events %}
+      <div class="event-card">
+        <div class="event-meta">
+          <span class="status-badge">{{ event.parent_festival }}</span>
+          <span class="status-badge subtle">{{ event.category_label }}</span>
+        </div>
+        <h3>{{ event.event_name }}</h3>
+        <p>{{ event.description }}</p>
+        <div class="event-footer">
+          <span>{{ event.event_date_label }} | {{ event.venue or 'Campus venue' }}</span>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">{% if current_user.role != 'host' and not selected_festival %}Select one festival button first to load its events.{% else %}No events available for the selected festival.{% endif %}</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">{{ 'Registration visibility' if current_user.role == 'host' else 'My submitted participations' }}</p>
+      <h3>{{ 'All registered participations' if current_user.role == 'host' else 'Participation history from your account' }}</h3>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          {% if current_user.role == 'host' %}<th>Participant</th><th>Registration No</th>{% endif %}
+          <th>Festival</th>
+          <th>Event</th>
+          <th>Date</th>
+          <th>Registered On</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in registration_rows %}
+        <tr>
+          {% if current_user.role == 'host' %}<td>{{ row.participant_name }}</td><td>{{ row.registration_number or '-' }}</td>{% endif %}
+          <td>{{ row.parent_festival }}</td>
+          <td>{{ row.event_name }}</td>
+          <td>{{ row.event_date_label }}</td>
+          <td>{{ row.registered_at[:10] if row.registered_at else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{% if current_user.role == 'host' %}6{% else %}4{% endif %}">No participation records available yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
