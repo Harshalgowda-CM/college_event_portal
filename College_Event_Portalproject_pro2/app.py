@@ -13,6 +13,11 @@ from flask import Flask, Response, flash, redirect, render_template, request, se
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+MPL_CONFIG_DIR = os.path.join(BASE_DIR, ".matplotlib")
+os.makedirs(MPL_CONFIG_DIR, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", MPL_CONFIG_DIR)
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -24,7 +29,6 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "college-event-portal-secret")
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.getenv("DB_PATH", os.path.join(BASE_DIR, "portal_pro.db"))
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(BASE_DIR, "static", "uploads"))
 
@@ -358,34 +362,6 @@ def get_admin_contact_number():
 
 def get_user_participant(user_id):
     return fetch_single("participants", where="user_id = ?", params=[user_id])
-
-
-def get_department_id_by_name(department_name):
-    if not department_name:
-        return None
-    row = fetch_single("departments", where="LOWER(department_name) = LOWER(?)", params=[department_name.strip()])
-    return row["department_id"] if row else None
-
-
-def get_host_manageable_users():
-    users = fetch_table("portal_users", order_by="created_at", descending=True)
-    users_by_id = {row["user_id"]: row for row in users}
-    participants = enrich_participants(fetch_table("participants", order_by="created_at", descending=True))
-    participant_by_user_id = {row["user_id"]: row for row in participants if row.get("user_id")}
-    for user in users:
-        participant = participant_by_user_id.get(user["user_id"])
-        user["participant_profile"] = participant
-        user["display_registration_number"] = (
-            user.get("registration_number")
-            or (participant.get("registration_number") if participant else None)
-            or "-"
-        )
-        user["display_department_name"] = (
-            user.get("department_name")
-            or (participant.get("department_label") if participant else None)
-            or "-"
-        )
-    return list(users_by_id.values())
 
 
 def login_required(view):
@@ -798,73 +774,92 @@ def render_chart(chart_type, festival_filter):
     ax.set_facecolor("#10172b")
     title_suffix = festival_filter if festival_filter and festival_filter != "ALL" else "All Festivals"
 
-    if chart_type == "bar":
-        items = payload["popularity_counter"].most_common(8)
-        labels = [item[0] for item in items] or ["No data"]
-        values = [item[1] for item in items] or [0]
-        ax.bar(labels, values, color="#59e8ff")
-        ax.set_title(f"Event Popularity - {title_suffix}", color="white")
-        ax.tick_params(axis="x", rotation=25, colors="white")
-        ax.tick_params(axis="y", colors="white")
-    elif chart_type == "line":
-        ordered = sorted(payload["daily_counter"].items(), key=lambda item: datetime.strptime(item[0], "%d %b %Y") if item[0] != "Date to be announced" else datetime.today())
-        labels = [item[0] for item in ordered] or ["No data"]
-        values = [item[1] for item in ordered] or [0]
-        ax.plot(labels, values, color="#ff61c7", linewidth=3, marker="o")
-        ax.fill_between(range(len(values)), values, color="#ff61c7", alpha=0.15)
-        ax.set_title(f"Registration Trend - {title_suffix}", color="white")
-        ax.tick_params(axis="x", rotation=25, colors="white")
-        ax.tick_params(axis="y", colors="white")
-    elif chart_type == "pie":
-        items = payload["category_counter"].most_common()
-        labels = [item[0] for item in items] or ["No data"]
-        values = [item[1] for item in items] or [1]
-        colors = ["#59e8ff", "#ff61c7", "#ffd76d", "#79ffb5", "#8c79ff"][: len(labels)]
-        ax.pie(values, labels=labels, autopct="%1.1f%%", colors=colors, textprops={"color": "white"})
-        ax.set_title(f"Category Share - {title_suffix}", color="white")
-    elif chart_type == "histogram":
-        ax.hist(payload["registration_distribution"], bins=min(8, max(payload["registration_distribution"]) + 1), color="#ffd76d", edgecolor="#0b1020")
-        ax.set_title(f"Registrations Per Event Distribution - {title_suffix}", color="white")
-        ax.tick_params(axis="x", colors="white")
-        ax.tick_params(axis="y", colors="white")
-    elif chart_type == "grouped":
-        top_departments = list(payload["grouped_counter"].keys())[:5] or ["No data"]
-        x_positions = list(range(len(top_departments)))
-        width = 0.22
-        colors = {"ELEGANT": "#59e8ff", "ECHOES OF YOUTH": "#ff61c7", "NEXUS": "#ffd76d"}
-        for index, festival_name in enumerate(FESTIVAL_NAMES):
-            festival_values = [payload["grouped_counter"][department].get(festival_name, 0) for department in top_departments]
-            shifted = [position + (index - 1) * width for position in x_positions]
-            ax.bar(shifted, festival_values, width=width, label=festival_name, color=colors[festival_name])
-        ax.set_xticks(x_positions)
-        ax.set_xticklabels(top_departments, rotation=20, color="white")
-        ax.tick_params(axis="y", colors="white")
-        ax.legend(facecolor="#10172b", edgecolor="#1d2746", labelcolor="white")
-        ax.set_title(f"Inter-Department Festival Comparison - {title_suffix}", color="white")
-    elif chart_type == "students":
-        department_items = payload["student_department_counter"].most_common(8)
-        labels = [item[0] for item in department_items] or ["No data"]
-        values = [item[1] for item in department_items] or [0]
-        ax.bar(labels, values, color="#79ffb5")
-        ax2 = ax.twinx()
-        year_items = sorted(payload["student_year_counter"].items(), key=lambda item: item[0])
-        year_labels = [item[0] for item in year_items]
-        year_values = [item[1] for item in year_items]
-        if year_labels:
-            ax2.plot(range(len(year_labels)), year_values, color="#ffd76d", linewidth=2.5, marker="o")
-            ax2.set_yticks([])
-        ax.set_title(f"Student Distribution - {title_suffix}", color="white")
-        ax.tick_params(axis="x", rotation=22, colors="white")
-        ax.tick_params(axis="y", colors="white")
-        ax2.spines["right"].set_color("#1d2746")
-    else:
-        ax.text(0.5, 0.5, "Unknown chart", ha="center", va="center", color="white")
-        ax.axis("off")
+    try:
+        if chart_type == "bar":
+            items = payload["popularity_counter"].most_common(8)
+            labels = [item[0] for item in items] or ["No data"]
+            values = [item[1] for item in items] or [0]
+            ax.bar(labels, values, color="#59e8ff")
+            ax.set_title(f"Event Popularity - {title_suffix}", color="white")
+            ax.tick_params(axis="x", rotation=25, colors="white")
+            ax.tick_params(axis="y", colors="white")
+        elif chart_type == "line":
+            ordered = sorted(
+                payload["daily_counter"].items(),
+                key=lambda item: datetime.strptime(item[0], "%d %b %Y") if item[0] != "Date to be announced" else datetime.today(),
+            )
+            labels = [item[0] for item in ordered] or ["No data"]
+            values = [item[1] for item in ordered] or [0]
+            positions = list(range(len(labels)))
+            ax.plot(positions, values, color="#ff61c7", linewidth=3, marker="o")
+            ax.fill_between(positions, values, color="#ff61c7", alpha=0.15)
+            ax.set_xticks(positions)
+            ax.set_xticklabels(labels, rotation=25, color="white")
+            ax.set_title(f"Registration Trend - {title_suffix}", color="white")
+            ax.tick_params(axis="y", colors="white")
+        elif chart_type == "pie":
+            items = payload["category_counter"].most_common()
+            labels = [item[0] for item in items] or ["No data"]
+            values = [item[1] for item in items] or [1]
+            colors = ["#59e8ff", "#ff61c7", "#ffd76d", "#79ffb5", "#8c79ff"][: len(labels)]
+            ax.pie(values, labels=labels, autopct="%1.1f%%", colors=colors, textprops={"color": "white"})
+            ax.set_title(f"Category Share - {title_suffix}", color="white")
+        elif chart_type == "histogram":
+            histogram_values = [value for value in payload["registration_distribution"] if value is not None]
+            bins = min(8, max(histogram_values) + 1) if histogram_values else 1
+            ax.hist(histogram_values or [0], bins=max(bins, 1), color="#ffd76d", edgecolor="#0b1020")
+            ax.set_title(f"Registrations Per Event Distribution - {title_suffix}", color="white")
+            ax.tick_params(axis="x", colors="white")
+            ax.tick_params(axis="y", colors="white")
+        elif chart_type == "grouped":
+            grouped_departments = payload["grouped_counter"]
+            top_departments = list(grouped_departments.keys())[:5] or ["No data"]
+            x_positions = list(range(len(top_departments)))
+            width = 0.22
+            colors = {"ELEGANT": "#59e8ff", "ECHOES OF YOUTH": "#ff61c7", "NEXUS": "#ffd76d"}
+            for index, festival_name in enumerate(FESTIVAL_NAMES):
+                festival_values = [grouped_departments[department].get(festival_name, 0) for department in top_departments]
+                shifted = [position + (index - 1) * width for position in x_positions]
+                ax.bar(shifted, festival_values, width=width, label=festival_name, color=colors[festival_name])
+            ax.set_xticks(x_positions)
+            ax.set_xticklabels(top_departments, rotation=20, color="white")
+            ax.tick_params(axis="y", colors="white")
+            ax.legend(facecolor="#10172b", edgecolor="#1d2746", labelcolor="white")
+            ax.set_title(f"Inter-Department Festival Comparison - {title_suffix}", color="white")
+        elif chart_type == "students":
+            department_items = payload["student_department_counter"].most_common(8)
+            labels = [item[0] for item in department_items] or ["No data"]
+            values = [item[1] for item in department_items] or [0]
+            positions = list(range(len(labels)))
+            ax.bar(positions, values, color="#79ffb5")
+            ax.set_xticks(positions)
+            ax.set_xticklabels(labels, rotation=22, color="white")
+            ax2 = ax.twinx()
+            year_items = sorted(payload["student_year_counter"].items(), key=lambda item: item[0])
+            year_labels = [item[0] for item in year_items]
+            year_values = [item[1] for item in year_items]
+            if year_labels:
+                ax2.plot(range(len(year_labels)), year_values, color="#ffd76d", linewidth=2.5, marker="o")
+                ax2.set_xticks(range(len(year_labels)))
+                ax2.set_xticklabels(year_labels, color="white")
+                ax2.set_yticks([])
+            ax.set_title(f"Student Distribution - {title_suffix}", color="white")
+            ax.tick_params(axis="y", colors="white")
+            ax2.spines["right"].set_color("#1d2746")
+        else:
+            ax.text(0.5, 0.5, "Unknown chart", ha="center", va="center", color="white")
+            ax.axis("off")
 
-    if chart_type != "pie":
-        for spine in ax.spines.values():
-            spine.set_color("#1d2746")
-        ax.grid(axis="y", color="#1d2746", alpha=0.4)
+        if chart_type != "pie":
+            for spine in ax.spines.values():
+                spine.set_color("#1d2746")
+            ax.grid(axis="y", color="#1d2746", alpha=0.4)
+    except Exception:
+        ax.clear()
+        ax.set_facecolor("#10172b")
+        ax.text(0.5, 0.56, "Chart unavailable", ha="center", va="center", color="white", fontsize=20, fontweight="bold")
+        ax.text(0.5, 0.42, "This graph could not be generated for the current dataset.", ha="center", va="center", color="#c2cae3", fontsize=11)
+        ax.axis("off")
 
     fig.tight_layout()
     buffer = io.BytesIO()
@@ -1024,124 +1019,11 @@ def create_host_account():
     return redirect(url_for("host_accounts"))
 
 
-@app.route("/host/accounts/update/<int:user_id>", methods=["POST"])
-@login_required
-@host_required
-def update_host_managed_user(user_id):
-    target_user = fetch_single("portal_users", where="user_id = ?", params=[user_id])
-    if not target_user:
-        flash("User account not found.", "danger")
-        return redirect(url_for("host_accounts"))
-
-    full_name = request.form.get("full_name", "").strip()
-    mobile = request.form.get("mobile", "").strip()
-    role = request.form.get("role", "").strip().lower()
-    department_name = request.form.get("department_name", "").strip()
-    registration_number = request.form.get("registration_number", "").strip()
-    password = request.form.get("password", "").strip()
-
-    if not full_name or not mobile:
-        flash("Name and phone number are required.", "danger")
-        return redirect(url_for("host_accounts", edit_user_id=user_id))
-    if role not in {"host", "student", "faculty", "organiser", "coordinator"}:
-        flash("Please select a valid role.", "danger")
-        return redirect(url_for("host_accounts", edit_user_id=user_id))
-
-    existing_mobile = fetch_single("portal_users", where="mobile = ? AND user_id != ?", params=[mobile, user_id])
-    if existing_mobile:
-        flash("Another account already uses that phone number.", "danger")
-        return redirect(url_for("host_accounts", edit_user_id=user_id))
-
-    participant = get_user_participant(user_id)
-    payload = {
-        "full_name": full_name,
-        "mobile": mobile,
-        "role": role,
-        "department_name": department_name or None,
-    }
-
-    if role == "student":
-        if not registration_number:
-            flash("Registration number is required for student accounts.", "danger")
-            return redirect(url_for("host_accounts", edit_user_id=user_id))
-        existing_registration = fetch_single(
-            "portal_users",
-            where="registration_number = ? AND user_id != ?",
-            params=[registration_number, user_id],
-        )
-        if existing_registration:
-            flash("Another account already uses that registration number.", "danger")
-            return redirect(url_for("host_accounts", edit_user_id=user_id))
-        existing_participant_registration = fetch_single(
-            "participants",
-            where="registration_number = ? AND user_id != ?",
-            params=[registration_number, user_id],
-        )
-        if existing_participant_registration:
-            flash("Another participant already uses that registration number.", "danger")
-            return redirect(url_for("host_accounts", edit_user_id=user_id))
-        payload["registration_number"] = registration_number
-    else:
-        payload["registration_number"] = None
-
-    if role == "faculty" and not department_name:
-        flash("Department is required for faculty accounts.", "danger")
-        return redirect(url_for("host_accounts", edit_user_id=user_id))
-
-    if password:
-        payload["password_hash"] = generate_password_hash(password)
-
-    update_record("portal_users", "user_id", user_id, payload)
-
-    if participant:
-        participant_department_id = get_department_id_by_name(department_name) if department_name else participant.get("department_id")
-        participant_payload = {
-            "participant_name": full_name,
-            "registration_number": registration_number or None,
-            "roll_number": registration_number or participant.get("roll_number"),
-            "phone": mobile,
-        }
-        if participant_department_id:
-            participant_payload["department_id"] = participant_department_id
-        update_record("participants", "participant_id", participant["participant_id"], participant_payload)
-
-    flash("User account updated successfully.", "success")
-    return redirect(url_for("host_accounts"))
-
-
-@app.route("/host/accounts/delete/<int:user_id>", methods=["POST"])
-@login_required
-@host_required
-def delete_host_managed_user(user_id):
-    current_user = get_current_user()
-    if current_user and current_user["user_id"] == user_id:
-        flash("You cannot delete the currently logged-in host account.", "danger")
-        return redirect(url_for("host_accounts"))
-
-    target_user = fetch_single("portal_users", where="user_id = ?", params=[user_id])
-    if not target_user:
-        flash("User account not found.", "danger")
-        return redirect(url_for("host_accounts"))
-
-    participant = get_user_participant(user_id)
-    if participant:
-        execute("DELETE FROM competition_results WHERE participant_id = ?", [participant["participant_id"]])
-        execute("DELETE FROM event_participants WHERE participant_id = ?", [participant["participant_id"]])
-        execute("DELETE FROM participants WHERE participant_id = ?", [participant["participant_id"]])
-
-    execute("DELETE FROM portal_users WHERE user_id = ?", [user_id])
-    flash("User account deleted successfully.", "success")
-    return redirect(url_for("host_accounts"))
-
-
 @app.route("/host/accounts")
 @login_required
 @host_required
 def host_accounts():
     competition_events = [event for event in enrich_events(fetch_table("events", order_by="event_date")) if event["is_competition"]]
-    selected_edit_user_id = request.args.get("edit_user_id", type=int)
-    managed_users = get_host_manageable_users()
-    editable_user = next((row for row in managed_users if row["user_id"] == selected_edit_user_id), None)
     return render_template(
         "results.html",
         active_page="create_account",
@@ -1152,9 +1034,7 @@ def host_accounts():
         winner_map={},
         results_board=get_results_board(),
         host_staff_accounts=fetch_table("portal_users", where="role IN ('faculty','organiser','coordinator')", order_by="created_at", descending=True),
-        managed_users=managed_users,
-        editable_user=editable_user,
-        departments=get_departments(),
+        page_effect="celebration",
         show_create_account=True,
     )
 
