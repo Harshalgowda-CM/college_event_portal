@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Analytics | College Event Portal{% endblock %}
+{% block content %}
+<section class="page-header glass-panel">
+  <div>
+    <p class="eyebrow">Graph analytics</p>
+    <h1>Festival Graph Dashboard</h1>
+  </div>
+  <div class="hero-actions">
+    <span class="status-badge">Events {{ summary.total_events }}</span>
+    <span class="status-badge subtle">Registrations {{ summary.total_registrations }}</span>
+  </div>
+</section>
+
+<section class="bubble-bar glass-panel">
+  {% for chart_key, chart_label in chart_types.items() %}
+  <a href="{{ url_for('analytics', festival=selected_festival, chart=chart_key) }}" class="bubble-link {% if selected_chart == chart_key %}active{% endif %}">{{ chart_label }}</a>
+  {% endfor %}
+  <a href="{{ url_for('download_scope', scope='analytics', festival=selected_festival) }}" class="bubble-link">Download Data</a>
+</section>
+
+<section class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Graph controls</p>
+      <h3>Select festival and graph type</h3>
+    </div>
+    <a href="{{ url_for('analytics', festival=selected_festival, chart=selected_chart) }}" class="inline-link">Refresh</a>
+  </div>
+  <form method="GET" class="analytics-filter-grid">
+    <select name="festival">
+      <option value="ALL" {% if selected_festival == 'ALL' %}selected{% endif %}>All Festivals</option>
+      {% for festival_name in festival_names %}
+      <option value="{{ festival_name }}" {% if selected_festival == festival_name %}selected{% endif %}>{{ festival_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="chart">
+      {% for chart_key, chart_label in chart_types.items() %}
+      <option value="{{ chart_key }}" {% if selected_chart == chart_key %}selected{% endif %}>{{ chart_label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="primary-btn glow-btn">Show Selected Graph</button>
+  </form>
+</section>
+
+<section class="graph-viewer content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Selected graph</p>
+      <h3>{{ chart_types[selected_chart] }}</h3>
+    </div>
+  </div>
+  <div class="chart-frame">
+    <img src="{{ url_for('analytics_chart', chart_type=selected_chart, festival=selected_festival) }}" alt="{{ chart_types[selected_chart] }}">
+  </div>
+</section>
+
+<section class="grid-two">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Essential charts</p>
+        <h3>Bar and line analysis</h3>
+      </div>
+    </div>
+    <div class="mini-chart-stack">
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='bar', festival=selected_festival) }}" alt="Bar chart"></div>
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='line', festival=selected_festival) }}" alt="Line chart"></div>
+    </div>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Comparative charts</p>
+        <h3>Pie, histogram, and grouped view</h3>
+      </div>
+    </div>
+    <div class="mini-chart-stack">
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='pie', festival=selected_festival) }}" alt="Pie chart"></div>
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='histogram', festival=selected_festival) }}" alt="Histogram"></div>
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='grouped', festival=selected_festival) }}" alt="Grouped bar chart"></div>
+      <div class="chart-frame compact"><img src="{{ url_for('analytics_chart', chart_type='students', festival=selected_festival) }}" alt="Student distribution graph"></div>
+    </div>
+  </article>
+</section>
+{% endblock %}

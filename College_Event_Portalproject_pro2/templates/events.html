@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}Events | College Event Portal{% endblock %}
+{% block content %}
+<section class="page-header glass-panel">
+  <div>
+    <p class="eyebrow">{{ 'Host event authority' if current_user.role == 'host' else 'Student event discovery' }}</p>
+    <h1>{{ 'Create and Approve Festival Events' if current_user.role == 'host' else 'Explore ELEGANT, ECHOES OF YOUTH, and NEXUS' }}</h1>
+  </div>
+  <span class="status-badge">{{ 'Host Control Enabled' if current_user.role == 'host' else 'Approved Event View' }}</span>
+</section>
+
+<section class="bubble-bar glass-panel">
+  {% for festival_name in festival_names %}
+  <a href="#festival-{{ festival_name|replace(' ', '-') }}" class="bubble-link">{{ festival_name }}</a>
+  {% endfor %}
+  <a href="{{ url_for('download_scope', scope='events') }}" class="bubble-link">Download Events</a>
+</section>
+
+{% if current_user.role == 'host' %}
+<section class="grid-two">
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Event editor</p>
+        <h3>{{ 'Edit event' if edit_event else 'Create event' }}</h3>
+      </div>
+    </div>
+    <form method="POST" class="form-grid">
+      {% if edit_event %}
+      <input type="hidden" name="event_id" value="{{ edit_event.event_id }}">
+      {% endif %}
+      <input type="text" name="event_name" placeholder="Event name" value="{{ edit_event.event_name if edit_event else '' }}" required>
+      <select name="parent_festival" required>
+        {% for festival_name in festival_names %}
+        <option value="{{ festival_name }}" {% if edit_event and edit_event.parent_festival == festival_name %}selected{% endif %}>{{ festival_name }}</option>
+        {% endfor %}
+      </select>
+      <select name="department_id">
+        <option value="">Select department</option>
+        {% for department in departments %}
+        <option value="{{ department.department_id }}" {% if edit_event and edit_event.department_id == department.department_id %}selected{% endif %}>{{ department.department_name }}</option>
+        {% endfor %}
+      </select>
+      <select name="category_id">
+        <option value="">Select category</option>
+        {% for category in categories %}
+        <option value="{{ category.category_id }}" {% if edit_event and edit_event.category_id == category.category_id %}selected{% endif %}>{{ category.category_name }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="event_date" value="{{ edit_event.event_date if edit_event else '' }}" required>
+      <input type="text" name="venue" placeholder="Venue" value="{{ edit_event.venue if edit_event else '' }}">
+      <input type="text" name="organizer_name" placeholder="Organizer name" value="{{ edit_event.organizer_name if edit_event else current_user.full_name }}" required>
+      <textarea name="description" placeholder="Event description">{{ edit_event.description if edit_event else '' }}</textarea>
+      <select name="status">
+        {% for value in ['Approved', 'Pending', 'Rejected'] %}
+        <option value="{{ value }}" {% if edit_event and edit_event.status == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label class="check-field">
+        <input type="checkbox" name="is_competition" {% if edit_event and edit_event.is_competition %}checked{% endif %}>
+        <span>Competition event</span>
+      </label>
+      <button type="submit" class="primary-btn glow-btn">{{ 'Update Event' if edit_event else 'Create Event' }}</button>
+    </form>
+  </article>
+
+  <article class="content-card glass-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Approval queue</p>
+        <h3>Student event requests</h3>
+      </div>
+    </div>
+    <div class="stack-list">
+      {% for event in pending_requests %}
+      <div class="list-row">
+        <div>
+          <strong>{{ event.parent_festival }} | {{ event.event_name }}</strong>
+          <p>{{ event.category_label }} | {{ event.event_date_label }}</p>
+        </div>
+        <div class="action-row">
+          <form method="POST" action="{{ url_for('event_action', event_id=event.event_id, action='approve') }}">
+            <button type="submit" class="primary-btn compact glow-btn">Approve</button>
+          </form>
+          <form method="POST" action="{{ url_for('event_action', event_id=event.event_id, action='reject') }}">
+            <button type="submit" class="ghost-btn compact glow-btn">Reject</button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">No pending event requests from students.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% elif can_request %}
+<section class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Request a new event</p>
+      <h3>Send it to the host for approval</h3>
+    </div>
+  </div>
+  <form method="POST" class="form-grid">
+    <input type="text" name="event_name" placeholder="Requested event name" required>
+    <select name="parent_festival" required>
+      {% for festival_name in festival_names %}
+      <option value="{{ festival_name }}">{{ festival_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="department_id">
+      <option value="">Select department</option>
+      {% for department in departments %}
+      <option value="{{ department.department_id }}">{{ department.department_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="category_id">
+      <option value="">Select category</option>
+      {% for category in categories %}
+      <option value="{{ category.category_id }}">{{ category.category_name }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="event_date" required>
+    <input type="text" name="venue" placeholder="Preferred venue">
+    <textarea name="description" placeholder="Describe the event and why it should be approved"></textarea>
+    <label class="check-field">
+      <input type="checkbox" name="is_competition">
+      <span>Competition event</span>
+    </label>
+    <button type="submit" class="primary-btn glow-btn">Send Request</button>
+  </form>
+</section>
+{% endif %}
+
+{% for festival_name, rows in event_groups.items() %}
+<section id="festival-{{ festival_name|replace(' ', '-') }}" class="content-card glass-panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Festival block</p>
+      <h3>{{ festival_name }}</h3>
+    </div>
+  </div>
+  <div class="event-showcase">
+    {% for event in rows %}
+    <div class="event-card">
+      <div class="event-meta">
+        <span class="status-badge">{{ event.category_label }}</span>
+        <span class="status-badge subtle">{{ event.event_date_label }}</span>
+      </div>
+      <h3>{{ event.event_name }}</h3>
+      <p>{{ event.description }}</p>
+      <div class="event-footer">
+        <span>{{ event.venue or 'Campus venue' }} | {{ event.status }}</span>
+        {% if current_user.role == 'host' %}
+        <a href="{{ url_for('events', edit_id=event.event_id) }}" class="inline-link">Edit</a>
+        {% else %}
+        <a href="{{ url_for('participations', festival=festival_name) }}" class="inline-link">Participate</a>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">No events in this festival.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
